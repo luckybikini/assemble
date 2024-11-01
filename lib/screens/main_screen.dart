@@ -189,11 +189,43 @@ class MainScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authService = AuthService();
+    final user = authService.currentUser;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        title: user == null
+            ? null
+            : StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const SizedBox.shrink();
+            }
+
+            final userData = snapshot.data!.data() as Map<String, dynamic>?;
+            final nickname = userData?['nickname'] as String? ?? '게스트';
+
+            return Row(
+              children: [
+                Text(
+                  '안녕하세요 $nickname님',
+                  style: TextStyle(
+                    color: Color(0xFF7F5E93),
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(
@@ -214,6 +246,7 @@ class MainScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 환영 메시지 추가
             const Text(
               '배달\nassemble',
               style: TextStyle(
