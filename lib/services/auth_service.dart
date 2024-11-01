@@ -8,7 +8,41 @@ class AuthService {
 
   // 현재 사용자 가져오기
   User? get currentUser => _auth.currentUser;
+  Future<Map<String, dynamic>?> getUserData(String userId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      return doc.data();
+    } catch (e) {
+      print('사용자 데이터 가져오기 실패: $e');
+      rethrow;
+    }
+  }
+  Future<void> updateNickname(String userId, String newNickname) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'nickname': newNickname,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('별명 업데이트 실패: $e');
+      rethrow;
+    }
+  }
+  Future<void> deleteAccount(String userId) async {
+    try {
+      // Firestore에서 사용자 데이터 삭제
+      await _firestore.collection('users').doc(userId).delete();
 
+      // Firebase Auth에서 사용자 삭제
+      final user = _auth.currentUser;
+      if (user != null) {
+        await user.delete();
+      }
+    } catch (e) {
+      print('계정 삭제 실패: $e');
+      rethrow;
+    }
+  }
   Future<bool> isUserInParty(String userId) async {
     try {
       final userDoc = await _firestore.collection('users').doc(userId).get();
