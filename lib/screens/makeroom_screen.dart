@@ -19,6 +19,7 @@ class _MakeRoomScreenState extends State<MakeRoomScreen> {
   final _authService = AuthService();
   final _chatService = ChatService();
   bool _isLoading = false;
+  bool _isTogether = true; // 기본값으로 함께 먹기 설정
 
   Widget _buildTextField({
     required String hint,
@@ -53,6 +54,36 @@ class _MakeRoomScreenState extends State<MakeRoomScreen> {
     );
   }
 
+  Widget _buildTogetherOption() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F8FA),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            '함께 식사하기',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Switch(
+            value: _isTogether,
+            onChanged: (value) {
+              setState(() => _isTogether = value);
+            },
+            activeColor: const Color(0xFFE6E6FA).withOpacity(0.5),
+            activeTrackColor: const Color(0xFF6F6FDA)
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _createRoomAndNavigate() async {
     if (_menuController.text.isEmpty ||
         _maxMembersController.text.isEmpty ||
@@ -78,6 +109,7 @@ class _MakeRoomScreenState extends State<MakeRoomScreen> {
         maxMembers: int.parse(_maxMembersController.text),
         leaderId: user.uid,
         orderDeadline: DateTime.now().add(const Duration(hours: 1)),
+        together: _isTogether, // together 필드 추가
       );
 
       if (mounted) {
@@ -121,69 +153,75 @@ class _MakeRoomScreenState extends State<MakeRoomScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildLabel('메뉴'),
-            _buildTextField(
-              hint: '메뉴를 입력하세요',
-              controller: _menuController,
-            ),
-            const SizedBox(height: 20),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('메뉴'),
+              _buildTextField(
+                hint: '메뉴를 입력하세요',
+                controller: _menuController,
+              ),
+              const SizedBox(height: 20),
 
-            _buildLabel('총 인원수'),
-            _buildTextField(
-              hint: '인원수를 입력하세요',
-              controller: _maxMembersController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 20),
+              _buildLabel('총 인원수'),
+              _buildTextField(
+                hint: '인원수를 입력하세요',
+                controller: _maxMembersController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 20),
 
-            _buildLabel('업체명'),
-            _buildTextField(
-              hint: '주문할 가게를 입력하세요',
-              controller: _storeController,
-            ),
-            const SizedBox(height: 20),
+              _buildLabel('업체명'),
+              _buildTextField(
+                hint: '주문할 가게를 입력하세요',
+                controller: _storeController,
+              ),
+              const SizedBox(height: 20),
 
-            _buildLabel('지점'),
-            _buildTextField(
-              hint: '주문할 식당의 지점을 입력하세요',
-              controller: _branchController,
-            ),
-            const SizedBox(height: 40),
+              _buildLabel('지점'),
+              _buildTextField(
+                hint: '주문할 식당의 지점을 입력하세요',
+                controller: _branchController,
+              ),
+              const SizedBox(height: 20),
 
-            Center(
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _createRoomAndNavigate,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE6E6FA),
-                  minimumSize: const Size(200, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
+              _buildLabel('식사 방식'),
+              _buildTogetherOption(),
+              const SizedBox(height: 40),
+
+              Center(
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _createRoomAndNavigate,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE6E6FA),
+                    minimumSize: const Size(200, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
                   ),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                  ),
-                )
-                    : const Text(
-                  '채팅방 만들기',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
+                  child: _isLoading
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                    ),
+                  )
+                      : const Text(
+                    '채팅방 만들기',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -11,6 +11,7 @@ class ChatService {
     required int maxMembers,
     required String leaderId,
     required DateTime orderDeadline,
+    required bool together,
   }) async {
     try {
       final docRef = await _firestore.collection('chatRooms').add({
@@ -23,6 +24,7 @@ class ChatService {
         'createdAt': FieldValue.serverTimestamp(),
         'orderDeadline': Timestamp.fromDate(orderDeadline),
         'members': {leaderId: true},
+        'together' : together,
       });
 
       // 방장의 joinedRooms 업데이트

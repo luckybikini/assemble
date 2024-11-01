@@ -52,27 +52,27 @@ class _PartyListScreenState extends State<PartyListScreen> {
         );
 
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(roomId: room.id),
-            ),
+          // 새로 참여하는 경우
+          await _chatService.joinRoom(room.id, currentUser.uid);
+          await _authService.updatePartyStatus(
+            userId: currentUser.uid,
+            partyId: room.id,
+            isInParty: true,
           );
-        }
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('파티에 참여했습니다!')),
+            );
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(roomId: room.id),
+              ),
+            );
+          }
       } else {
-        // 새로 참여하는 경우
-        await _chatService.joinRoom(room.id, currentUser.uid);
-        await _authService.updatePartyStatus(
-          userId: currentUser.uid,
-          partyId: room.id,
-          isInParty: true,
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('파티에 참여했습니다!')),
-          );
-
           Navigator.push(
             context,
             MaterialPageRoute(

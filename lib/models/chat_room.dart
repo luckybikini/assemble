@@ -11,6 +11,7 @@ class ChatRoom {
   final DateTime createdAt;
   final DateTime orderDeadline;
   final Map<String, bool> members;
+  final bool together;
 
   ChatRoom({
     required this.id,
@@ -23,6 +24,7 @@ class ChatRoom {
     required this.createdAt,
     required this.orderDeadline,
     required this.members,
+    required this.together,
   });
 
   factory ChatRoom.fromDocument(DocumentSnapshot doc) {
@@ -38,6 +40,7 @@ class ChatRoom {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       orderDeadline: (data['orderDeadline'] as Timestamp).toDate(),
       members: Map<String, bool>.from(data['members'] ?? {}),
+      together: data['together'] ?? false,
     );
   }
 
@@ -52,6 +55,7 @@ class ChatRoom {
       'createdAt': Timestamp.fromDate(createdAt),
       'orderDeadline': Timestamp.fromDate(orderDeadline),
       'members': members,
+      'together' : together,
     };
   }
 }
