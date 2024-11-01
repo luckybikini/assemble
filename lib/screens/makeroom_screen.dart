@@ -79,7 +79,7 @@ class MakeRoomScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ChatScreen()),
+                    MaterialPageRoute(builder: (context) => const ChatScreen(roomId: '',)),
                   );
                 },
                 style: ElevatedButton.styleFrom(

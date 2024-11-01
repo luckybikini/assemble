@@ -1,129 +1,41 @@
 // lib/screens/party_list_screen.dart
 import 'package:flutter/material.dart';
+import '../services/chat_service.dart';
+import '../models/chat_room.dart';
 import 'chat_screen.dart';
 
-class PartyListScreen extends StatelessWidget {
+class PartyListScreen extends StatefulWidget {
   const PartyListScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,  // 배경색을 흰색으로 변경
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Row(
-          children: [
-            const Text(
-              '필터',
-              style: TextStyle(
-                color: Colors.black,  // 텍스트 색상을 검은색으로 변경
-                fontSize: 18,
-              ),
-            ),
-            const Spacer(),
-            Switch(
-              value: true,
-              onChanged: (bool value) {},
-              activeColor: const Color(0xFFC871FD),  // 스위치 색상을 메인 테마 색상으로 변경
-              activeTrackColor: const Color(0xFFC871FD).withOpacity(0.3),
-            ),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          // 필터 버튼들
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD89DFF).withOpacity(0.2),  // 필터 버튼 배경색 변경
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    '같이 먹어요',
-                    style: TextStyle(
-                      color: Color(0xFFD89DFF),  // 텍스트 색상 변경
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8F8FA),  // 비활성 필터 배경색 변경
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    '따로 먹어요',
-                    style: TextStyle(
-                      color: Colors.grey,  // 비활성 텍스트 색상
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // 파티 목록
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: [
-                _buildPartyCard(
-                  context,
-                  title: '치킨의 민족',
-                  menu: '후라이드 치킨',
-                  capacity: '2/4',
-                  isAvailable: true,
-                ),
-                const SizedBox(height: 16),
-                _buildPartyCard(
-                  context,
-                  title: '피자헛',
-                  menu: '페페로니 피자',
-                  capacity: '3/4',
-                  isAvailable: true,
-                ),
-                const SizedBox(height: 16),
-                _buildPartyCard(
-                  context,
-                  title: '맥도날드',
-                  menu: '빅맥 세트',
-                  capacity: '1/4',
-                  isAvailable: true,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  State<PartyListScreen> createState() => _PartyListScreenState();
+}
 
-  Widget _buildPartyCard(
-      BuildContext context, {
-        required String title,
-        required String menu,
-        required String capacity,
-        required bool isAvailable,
-      }) {
+class _PartyListScreenState extends State<PartyListScreen> {
+  final ChatService _chatService = ChatService();
+  bool _showEatingTogether = true;
+
+  Widget _buildPartyCard(BuildContext context, ChatRoom room) {
+    final now = DateTime.now();
+    final remainingTime = room.orderDeadline.difference(now);
+    String timeText = '';
+
+    if (remainingTime.isNegative) {
+      timeText = '마감됨';
+    } else {
+      if (remainingTime.inHours > 0) {
+        timeText = '${remainingTime.inHours}시간 ${remainingTime.inMinutes % 60}분';
+      } else {
+        timeText = '${remainingTime.inMinutes}분';
+      }
+    }
+
     return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE0E0E0)),  // 테두리 색상 변경
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
@@ -144,9 +56,9 @@ class PartyListScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      title,
+                      room.title,
                       style: const TextStyle(
-                        color: Colors.black,  // 텍스트 색상 변경
+                        color: Colors.black,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -157,13 +69,13 @@ class PartyListScreen extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8F8FA),  // 배지 배경색 변경
+                        color: const Color(0xFFF3E5F5),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        capacity,
+                        '${room.currentMembers}/${room.maxMembers}',
                         style: const TextStyle(
-                          color: Colors.black87,  // 배지 텍스트 색상 변경
+                          color: Color(0xFF6A1B9A),
                           fontSize: 12,
                         ),
                       ),
@@ -172,9 +84,17 @@ class PartyListScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '메뉴: $menu',
+                  '메뉴: ${room.menu}',
                   style: const TextStyle(
                     color: Colors.grey,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '주문 마감까지: $timeText',
+                  style: TextStyle(
+                    color: remainingTime.isNegative ? Colors.red : Colors.grey,
                     fontSize: 14,
                   ),
                 ),
@@ -186,26 +106,145 @@ class PartyListScreen extends StatelessWidget {
             height: 48,
             decoration: const BoxDecoration(
               border: Border(
-                top: BorderSide(color: Color(0xFFE0E0E0)),  // 구분선 색상 변경
+                top: BorderSide(color: Color(0xFFE0E0E0)),
               ),
             ),
             child: TextButton(
-              onPressed: () {
+              onPressed: remainingTime.isNegative || room.currentMembers >= room.maxMembers
+                  ? null
+                  : () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ChatScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(roomId: room.id),
+                  ),
                 );
               },
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFCC8FFA),  // 버튼 텍스트 색상 변경
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(12),
-                    bottomRight: Radius.circular(12),
+                foregroundColor: const Color(0xFF6A1B9A),
+              ),
+              child: Text(
+                room.currentMembers >= room.maxMembers
+                    ? '정원 초과'
+                    : remainingTime.isNegative
+                    ? '마감됨'
+                    : '참여하기',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Row(
+          children: [
+            const Text(
+              '필터',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+              ),
+            ),
+            const Spacer(),
+            Switch(
+              value: _showEatingTogether,
+              onChanged: (value) {
+                setState(() => _showEatingTogether = value);
+              },
+              activeColor: const Color(0xFF6A1B9A),
+              activeTrackColor: const Color(0xFFCE93D8),
+            ),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _showEatingTogether
+                        ? const Color(0xFF6A1B9A).withOpacity(0.2)
+                        : const Color(0xFFF3E5F5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '같이 먹어요',
+                    style: TextStyle(
+                      color: _showEatingTogether
+                          ? const Color(0xFF6A1B9A)
+                          : Colors.grey,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
-              ),
-              child: const Text('참여하기'),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  decoration: BoxDecoration(
+                    color: !_showEatingTogether
+                        ? const Color(0xFF6A1B9A).withOpacity(0.2)
+                        : const Color(0xFFF3E5F5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '따로 먹어요',
+                    style: TextStyle(
+                      color: !_showEatingTogether
+                          ? const Color(0xFF6A1B9A)
+                          : Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<List<ChatRoom>>(
+              stream: _chatService.getActiveRooms(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final rooms = snapshot.data ?? [];
+                if (rooms.isEmpty) {
+                  return const Center(
+                    child: Text('현재 활성화된 파티가 없습니다.'),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16.0),
+                  itemCount: rooms.length,
+                  itemBuilder: (context, index) => _buildPartyCard(
+                    context,
+                    rooms[index],
+                  ),
+                );
+              },
             ),
           ),
         ],

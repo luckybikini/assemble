@@ -1,199 +1,238 @@
 // lib/screens/chat_screen.dart
 import 'package:flutter/material.dart';
-
-class Message {
-  final String text;
-  final bool isMe;
-  final String time;
-
-  Message({
-    required this.text,
-    required this.isMe,
-    required this.time,
-  });
-}
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/chat_service.dart';
+import '../services/auth_service.dart';
+import '../models/chat_room.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String roomId;
+
+  const ChatScreen({
+    super.key,
+    required this.roomId,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController _controller = TextEditingController();
-  final List<Message> _messages = [
-    Message(
-      text: "안녕하세요! 치킨 파티원 구합니다~",
-      isMe: false,
-      time: "오후 2:30",
-    ),
-    Message(
-      text: "저 참여하고 싶습니다!",
-      isMe: true,
-      time: "오후 2:31",
-    ),
-    Message(
-      text: "네 좋습니다! 인원은 4명 구하고 있어요",
-      isMe: false,
-      time: "오후 2:32",
-    ),
-  ];
+  final TextEditingController _messageController = TextEditingController();
+  final ChatService _chatService = ChatService();
+  final AuthService _authService = AuthService();
+  final ScrollController _scrollController = ScrollController();
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  Future<void> _sendMessage() async {
+    if (_messageController.text.trim().isEmpty) return;
+
+    try {
+      final user = _authService.currentUser;
+      if (user != null) {
+        await _chatService.sendMessage(
+          widget.roomId,
+          user.uid,
+          _messageController.text.trim(),
+        );
+        _messageController.clear();
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('메시지 전송 실패: $e')),
+      );
+    }
   }
 
-  void _handleSubmitted(String text) {
-    if (text.isEmpty) return;
+  Widget _buildMessage(DocumentSnapshot message, bool isMe, String? nickname) {
+    final data = message.data() as Map<String, dynamic>;
+    final timestamp = (data['timestamp'] as Timestamp).toDate();
+    final timeString = '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
 
-    _controller.clear();
-    setState(() {
-      _messages.add(Message(
-        text: text,
-        isMe: true,
-        time: "방금 전",
-      ));
-    });
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) ...[
+            CircleAvatar(
+              backgroundColor: const Color(0xFFF3E5F5),
+              radius: 16,
+              child: Text(
+                nickname?.substring(0, 1).toUpperCase() ?? '?',
+                style: const TextStyle(
+                  color: Color(0xFF6A1B9A),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Column(
+            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              if (!isMe)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 4),
+                  child: Text(
+                    nickname ?? '알 수 없음',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (isMe)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: Text(
+                        timeString,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                  Container(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isMe ? const Color(0xFF6A1B9A) : const Color(0xFFF3E5F5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      data['content'] ?? '',
+                      style: TextStyle(
+                        color: isMe ? Colors.white : Colors.black,
+                      ),
+                    ),
+                  ),
+                  if (!isMe)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        timeString,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = _authService.currentUser;
+
     return Scaffold(
       appBar: AppBar(
-        elevation: 0,
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        title: const Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Color(0xFFE6E6FA),
-              child: Text(
-                '치킨',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.black,
+        elevation: 0,
+        title: StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('chatRooms')
+              .doc(widget.roomId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Text('로딩중...');
+            }
+
+            final room = ChatRoom.fromDocument(snapshot.data!);
+            return Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(0xFFF3E5F5),
+                  child: Text(
+                    room.title.substring(0, 1),
+                    style: const TextStyle(color: Color(0xFF6A1B9A)),
+                  ),
                 ),
-              ),
-            ),
-            SizedBox(width: 8),
-            Text(
-              '치킨 파티방',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      room.title,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${room.currentMembers}/${room.maxMembers}명',
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () {},
-          ),
-        ],
+        iconTheme: const IconThemeData(color: Color(0xFF6A1B9A)),
       ),
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(8.0),
-              reverse: false,
-              itemCount: _messages.length,
-              itemBuilder: (_, index) {
-                final message = _messages[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    mainAxisAlignment: message.isMe
-                        ? MainAxisAlignment.end
-                        : MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (!message.isMe) ...[
-                        const CircleAvatar(
-                          backgroundColor: Color(0xFFE6E6FA),
-                          radius: 15,
-                          child: Text(
-                            '파티장',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      Column(
-                        crossAxisAlignment: message.isMe
-                            ? CrossAxisAlignment.end
-                            : CrossAxisAlignment.start,
-                        children: [
-                          if (!message.isMe)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 4, bottom: 4),
-                              child: Text(
-                                '파티장',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              if (message.isMe)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 4),
-                                  child: Text(
-                                    message.time,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ),
-                              Container(
-                                constraints: BoxConstraints(
-                                  maxWidth: MediaQuery.of(context).size.width * 0.7,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: message.isMe
-                                      ? const Color(0xFFE6E6FA)  // 라벤더색
-                                      : const Color(0xFFF0F0F0), // 회색
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  message.text,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              ),
-                              if (!message.isMe)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 4),
-                                  child: Text(
-                                    message.time,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _chatService.getMessages(widget.roomId),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text('오류 발생: ${snapshot.error}'));
+                }
+
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final messages = snapshot.data!.docs;
+                return ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final message = messages[index];
+                    final data = message.data() as Map<String, dynamic>;
+                    final isMe = currentUser?.uid == data['senderId'];
+
+                    return FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(data['senderId'])
+                          .get(),
+                      builder: (context, userSnapshot) {
+                        String? nickname;
+                        if (userSnapshot.hasData && userSnapshot.data != null) {
+                          nickname = userSnapshot.data!.get('nickname') as String?;
+                        }
+                        return _buildMessage(message, isMe, nickname);
+                      },
+                    );
+                  },
                 );
               },
             ),
@@ -216,14 +255,9 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () {},
-                    color: Colors.grey,
-                  ),
                   Expanded(
                     child: TextField(
-                      controller: _controller,
+                      controller: _messageController,
                       decoration: InputDecoration(
                         hintText: '메시지 입력',
                         border: OutlineInputBorder(
@@ -231,20 +265,20 @@ class _ChatScreenState extends State<ChatScreen> {
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: const Color(0xFFF8F8FA),
+                        fillColor: const Color(0xFFF3E5F5),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20,
                           vertical: 10,
                         ),
                       ),
                       textInputAction: TextInputAction.send,
-                      onSubmitted: _handleSubmitted,
+                      onSubmitted: (_) => _sendMessage(),
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.send),
-                    onPressed: () => _handleSubmitted(_controller.text),
-                    color: const Color(0xFFE6E6FA),
+                    onPressed: _sendMessage,
+                    color: const Color(0xFF6A1B9A),
                   ),
                 ],
               ),
@@ -253,5 +287,12 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 }
