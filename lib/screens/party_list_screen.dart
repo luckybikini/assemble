@@ -250,73 +250,69 @@ class _PartyListScreenState extends State<PartyListScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Row(
-          children: [
-            const Text(
-              '필터',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-              ),
-            ),
-            const Spacer(),
-            Switch(
-              value: _showEatingTogether,
-              onChanged: (value) {
-                setState(() => _showEatingTogether = value);
-              },
-              activeColor: const Color(0xFF6A1B9A),
-              activeTrackColor: const Color(0xFFCE93D8),
-            ),
-          ],
+        title: const Text(
+          '파티 목록',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+          ),
         ),
+        centerTitle: true,
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _showEatingTogether
-                        ? const Color(0xFF6A1B9A).withOpacity(0.2)
-                        : const Color(0xFFF3E5F5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '같이 먹어요',
-                    style: TextStyle(
-                      color: _showEatingTogether
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() => _showEatingTogether = true);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _showEatingTogether
                           ? const Color(0xFF6A1B9A)
-                          : Colors.grey,
-                      fontSize: 14,
+                          : const Color(0xFFF3E5F5),
+                      elevation: _showEatingTogether ? 2 : 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      '같이 먹어요',
+                      style: TextStyle(
+                        color: _showEatingTogether ? Colors.white : Colors.grey,
+                        fontSize: 14,
+                        fontWeight: _showEatingTogether ? FontWeight.bold : FontWeight.normal,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: !_showEatingTogether
-                        ? const Color(0xFF6A1B9A).withOpacity(0.2)
-                        : const Color(0xFFF3E5F5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '따로 먹어요',
-                    style: TextStyle(
-                      color: !_showEatingTogether
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() => _showEatingTogether = false);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: !_showEatingTogether
                           ? const Color(0xFF6A1B9A)
-                          : Colors.grey,
-                      fontSize: 14,
+                          : const Color(0xFFF3E5F5),
+                      elevation: !_showEatingTogether ? 2 : 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      '따로 먹어요',
+                      style: TextStyle(
+                        color: !_showEatingTogether ? Colors.white : Colors.grey,
+                        fontSize: 14,
+                        fontWeight: !_showEatingTogether ? FontWeight.bold : FontWeight.normal,
+                      ),
                     ),
                   ),
                 ),
@@ -335,19 +331,32 @@ class _PartyListScreenState extends State<PartyListScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final rooms = snapshot.data ?? [];
-                if (rooms.isEmpty) {
+                final allRooms = snapshot.data ?? [];
+                if (allRooms.isEmpty) {
                   return const Center(
                     child: Text('현재 활성화된 파티가 없습니다.'),
                   );
                 }
 
+                // together 필드에 따라 방 필터링
+                final filteredRooms = allRooms.where((room) => room.together == _showEatingTogether).toList();
+
+                if (filteredRooms.isEmpty) {
+                  return Center(
+                    child: Text(
+                      _showEatingTogether
+                          ? '현재 같이 먹는 파티가 없습니다.'
+                          : '현재 따로 먹는 파티가 없습니다.',
+                    ),
+                  );
+                }
+
                 return ListView.builder(
                   padding: const EdgeInsets.all(16.0),
-                  itemCount: rooms.length,
+                  itemCount: filteredRooms.length,
                   itemBuilder: (context, index) => _buildPartyCard(
                     context,
-                    rooms[index],
+                    filteredRooms[index],
                   ),
                 );
               },

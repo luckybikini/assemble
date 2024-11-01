@@ -137,14 +137,33 @@ class ChatService {
         final members = Map<String, dynamic>.from(roomData['members'] ?? {});
         final leaderId = roomData['leaderId'];
 
+        // 유저 상태 업데이트
+        transaction.update(userRef, {
+          'currentPartyId': null,
+          'isInParty': false,
+          'lastUpdated': FieldValue.serverTimestamp()
+        });
+
         if (leaderId == userId) {
-          // 방장이 나가면 방 비활성화
-          transaction.update(roomRef, {
-            'status': 'inactive',
-            'members.$userId': FieldValue.delete(),
-            'currentMembers': currentMembers - 1,
-          });
-        } else if (members.containsKey(userId)) {
+          // 방장이 나가는 경우 방의 모든 멤버들의 상태를 업데이트
+          for (String memberId in members.keys) {
+            if (memberId != userId) {  // 방장 자신은 이미 위에서 처리했으므로 제외
+              transaction.update(
+                  _firestore.collection('users').doc(memberId),
+                  {
+                    'currentPartyId': null,
+                    'isInParty': false,
+                    'lastUpdated': FieldValue.serverTimestamp()
+                  }
+              );
+            }
+          }
+
+          // 채팅방 문서를 삭제하기 전에 메시지 하위 컬렉션도 삭제해야 함
+          // 그러나 트랜잭션 내에서는 하위 컬렉션 삭제가 불가능하므로
+          // 트랜잭션 완료 후 별도로 처리
+          transaction.delete(roomRef);
+        } else {
           // 일반 멤버가 나가는 경우
           members.remove(userId);
           transaction.update(roomRef, {
@@ -152,19 +171,56 @@ class ChatService {
             'currentMembers': currentMembers - 1,
           });
         }
-
-        // 유저 상태 업데이트
-        transaction.update(userRef, {
-          'currentPartyId': null,
-          'isInParty': false,
-          'lastUpdated': FieldValue.serverTimestamp()
-        });
       });
+
+      // 방장이 나간 경우 메시지 하위 컬렉션 삭제
+      if (await isLeader(roomId, userId)) {
+        await deleteRoomMessages(roomId);
+      }
+
     } catch (e) {
       print('leaveRoom 실패: $e');
       throw Exception('채팅방 나가기 중 오류가 발생했습니다: $e');
     }
   }
+
+  // 해당 유저가 방장인지 확인하는 헬퍼 메서드
+  Future<bool> isLeader(String roomId, String userId) async {
+    try {
+      final roomDoc = await _firestore.collection('chatRooms').doc(roomId).get();
+      return roomDoc.data()?['leaderId'] == userId;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 채팅방의 모든 메시지를 삭제하는 헬퍼 메서드
+  Future<void> deleteRoomMessages(String roomId) async {
+    final roomRef = _firestore.collection('chatRooms');
+    try {
+      // 메시지 컬렉션의 모든 문서 가져오기
+      final messagesSnapshot = await _firestore
+          .collection('chatRooms')
+          .doc(roomId)
+          .collection('messages')
+          .get();
+
+      // 각 메시지 문서 삭제
+      final batch = _firestore.batch();
+      for (var doc in messagesSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+
+      print('채팅방 메시지 삭제 완료');
+    } catch (e) {
+      print('메시지 삭제 중 오류 발생: $e');
+      // 메시지 삭제 실패는 치명적이지 않으므로 예외를 다시 던지지 않음
+    }
+    roomRef.doc(roomId).delete();
+  }
+
 
   // 활성화된 채팅방 목록 가져오기
   Stream<List<ChatRoom>> getActiveRooms() {
