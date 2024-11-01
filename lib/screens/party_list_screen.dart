@@ -1,7 +1,9 @@
 // lib/screens/party_list_screen.dart
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../models/chat_room.dart';
+
 import 'chat_screen.dart';
 
 class PartyListScreen extends StatefulWidget {
@@ -13,8 +15,80 @@ class PartyListScreen extends StatefulWidget {
 
 class _PartyListScreenState extends State<PartyListScreen> {
   final ChatService _chatService = ChatService();
+  final AuthService _authService = AuthService();
   bool _showEatingTogether = true;
 
+  Future<void> _joinAndNavigateToChat(BuildContext context, ChatRoom room) async {
+    try {
+      final currentUser = _authService.currentUser;
+      if (currentUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인이 필요합니다.')),
+        );
+        return;
+      }
+
+      // 이미 다른 파티에 참여중인지 확인
+      final isInParty = await _authService.isUserInParty(currentUser.uid);
+      if (isInParty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('이미 다른 파티에 참여중입니다. 기존 파티를 먼저 나가주세요.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 이미 참여한 멤버인지 확인
+      if (room.members.containsKey(currentUser.uid)) {
+        // 참여 상태 업데이트
+        await _authService.updatePartyStatus(
+          userId: currentUser.uid,
+          partyId: room.id,
+          isInParty: true,
+        );
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(roomId: room.id),
+            ),
+          );
+        }
+      } else {
+        // 새로 참여하는 경우
+        await _chatService.joinRoom(room.id, currentUser.uid);
+        await _authService.updatePartyStatus(
+          userId: currentUser.uid,
+          partyId: room.id,
+          isInParty: true,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('파티에 참여했습니다!')),
+          );
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(roomId: room.id),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('참여 실패: $e')),
+        );
+      }
+    }
+  }
   Widget _buildPartyCard(BuildContext context, ChatRoom room) {
     final now = DateTime.now();
     final remainingTime = room.orderDeadline.difference(now);

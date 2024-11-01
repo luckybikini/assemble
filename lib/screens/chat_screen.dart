@@ -24,6 +24,28 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
 
+  Future<void> _leaveRoom() async {
+    try {
+      final user = _authService.currentUser;
+      if (user != null) {
+        await _chatService.leaveRoom(widget.roomId, user.uid);
+        await _authService.leaveParty(user.uid);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('파티에서 나갔습니다.')),
+          );
+          Navigator.of(context).pop();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('파티 나가기 실패: $e')),
+        );
+      }
+    }
+  }
   Widget _buildMessage(DocumentSnapshot message, bool isMe, String? nickname) {
     final data = message.data() as Map<String, dynamic>;
     final timestamp = (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
@@ -219,6 +241,12 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           },
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.exit_to_app),
+            onPressed: _leaveRoom,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(

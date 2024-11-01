@@ -9,6 +9,16 @@ class AuthService {
   // 현재 사용자 가져오기
   User? get currentUser => _auth.currentUser;
 
+  Future<bool> isUserInParty(String userId) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final userData = userDoc.data();
+      return userData?['currentPartyId'] != null && userData?['isInParty'] == true;
+    } catch (e) {
+      print('파티 참여 상태 확인 실패: $e');
+      return false;
+    }
+  }
   // 이메일 중복 체크
   Future<bool> isEmailAlreadyInUse(String email) async {
     try {
@@ -47,6 +57,8 @@ class AuthService {
           'nickname': nickname,
           'createdAt': FieldValue.serverTimestamp(),
           'lastLoginAt': FieldValue.serverTimestamp(),
+          'currentPartyId': null,  // 현재 참여중인 파티 ID
+          'isInParty': false,
         });
 
         print('Firestore 데이터 저장 성공'); // 디버그 로그
@@ -78,6 +90,35 @@ class AuthService {
     }
   }
 
+  Future<void> updatePartyStatus({
+    required String userId,
+    String? partyId,
+    required bool isInParty,
+  }) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'currentPartyId': partyId,
+        'isInParty': isInParty,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('파티 상태 업데이트 실패: $e');
+      throw '파티 상태 업데이트 중 오류가 발생했습니다.';
+    }
+  }
+
+  Future<void> leaveParty(String userId) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'currentPartyId': null,
+        'isInParty': false,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('파티 나가기 실패: $e');
+      throw '파티 나가기 중 오류가 발생했습니다.';
+    }
+  }
   // 로그인
   Future<User?> signIn(String email, String password) async {
     try {
