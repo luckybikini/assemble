@@ -68,10 +68,12 @@ class ChatService {
       final currentMembers = roomDoc.data()?['currentMembers'] ?? 0;
       final maxMembers = roomDoc.data()?['maxMembers'] ?? 0;
 
+      // 최대 인원 제한을 초과하는 경우 예외 처리
       if (currentMembers >= maxMembers) {
         throw Exception('방이 가득 찼습니다.');
       }
 
+      // 멤버 필드와 현재 인원 수 업데이트
       transaction.update(roomRef, {
         'members.$userId': true,
         'currentMembers': currentMembers + 1,
@@ -94,9 +96,10 @@ class ChatService {
       final leaderId = roomDoc.data()?['leaderId'];
 
       if (leaderId == userId) {
-        // 방장이 나가면 방 삭제 또는 비활성화
+        // 방장이 나가면 방 비활성화
         transaction.update(roomRef, {'status': 'inactive'});
       } else {
+        // 멤버 필드와 현재 인원 수 업데이트
         transaction.update(roomRef, {
           'members.$userId': FieldValue.delete(),
           'currentMembers': currentMembers - 1,
