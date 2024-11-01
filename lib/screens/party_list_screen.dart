@@ -1,4 +1,5 @@
 // lib/screens/party_list_screen.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
@@ -18,6 +19,7 @@ class _PartyListScreenState extends State<PartyListScreen> {
   final AuthService _authService = AuthService();
   bool _showEatingTogether = true;
 
+  // lib/screens/party_list_screen.dart
   Future<void> _joinAndNavigateToChat(BuildContext context, ChatRoom room) async {
     try {
       final currentUser = _authService.currentUser;
@@ -28,9 +30,20 @@ class _PartyListScreenState extends State<PartyListScreen> {
         return;
       }
 
+      // 디버깅 로그 추가
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      final userData = userDoc.data();
+      print('디버그 로그:');
+      print('참가하려는 방 ID: ${room.id}');
+      print('유저의 currentPartyId: ${userData?['currentPartyId']}');
+      print('유저의 isInParty: ${userData?['isInParty']}');
+
       // 이미 다른 파티에 참여중인지 확인
       final isInParty = await _authService.isUserInParty(currentUser.uid);
-      if (isInParty) {
+      if (isInParty && userData?['currentPartyId'] != room.id) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -75,6 +88,7 @@ class _PartyListScreenState extends State<PartyListScreen> {
       }
     }
   }
+  // party_list_screen.dart의 _buildPartyCard 메서드 수정
   Widget _buildPartyCard(BuildContext context, ChatRoom room) {
     final now = DateTime.now();
     final remainingTime = room.orderDeadline.difference(now);
@@ -170,15 +184,47 @@ class _PartyListScreenState extends State<PartyListScreen> {
               ),
             ),
             child: TextButton(
-              onPressed: remainingTime.isNegative || room.currentMembers >= room.maxMembers
+              onPressed: (remainingTime.isNegative || room.currentMembers >= room.maxMembers)
                   ? null
-                  : () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ChatScreen(roomId: room.id),
-                  ),
-                );
+                  : () async {
+                // 현재 유저 가져오기
+                final currentUser = _authService.currentUser;
+                if (currentUser == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('로그인이 필요합니다.')),
+                  );
+                  return;
+                }
+
+                // 참여하기 전에 유저의 현재 상태 확인
+                final userDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .get();
+                final userData = userDoc.data();
+
+                // 디버그 로그 출력
+                print('===== 참여하기 버튼 클릭 =====');
+                print('참가하려는 방 ID: ${room.id}');
+                print('유저의 currentPartyId: ${userData?['currentPartyId']}');
+                print('유저의 isInParty: ${userData?['isInParty']}');
+                print('===========================');
+
+                // 파티 참여 상태 확인
+                if (userData?['isInParty'] == true && userData?['currentPartyId'] != room.id) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('이미 다른 파티에 참여중입니다. 기존 파티를 먼저 나가주세요.'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                // 참여 처리 실행
+                await _joinAndNavigateToChat(context, room);
               },
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF6A1B9A),
