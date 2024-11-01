@@ -67,22 +67,43 @@ class ChatService {
 
     await _firestore.runTransaction((transaction) async {
       final roomDoc = await transaction.get(roomRef);
-      final currentMembers = roomDoc.data()?['currentMembers'] ?? 0;
-      final maxMembers = roomDoc.data()?['maxMembers'] ?? 0;
 
-      // 최대 인원 제한을 초과하는 경우 예외 처리
+      if (!roomDoc.exists) {
+        throw Exception('채팅방이 존재하지 않습니다.');
+      }
+
+      final roomData = roomDoc.data()!;
+      final currentMembers = roomData['currentMembers'] ?? 0;
+      final maxMembers = roomData['maxMembers'] ?? 0;
+
+      // 이미 참여한 멤버인지 확인
+      final members = Map<String, bool>.from(roomData['members'] ?? {});
+      if (members.containsKey(userId)) {
+        // 이미 참여 중인 경우 사용자 상태만 업데이트
+        transaction.update(userRef, {
+          'currentPartyId': roomId,
+          'isInParty': true,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      // 최대 인원 제한을 초과하는 경우
       if (currentMembers >= maxMembers) {
         throw Exception('방이 가득 찼습니다.');
       }
 
-      // 멤버 필드와 현재 인원 수 업데이트
+      // 새로운 멤버 추가 및 현재 인원 수 증가
       transaction.update(roomRef, {
         'members.$userId': true,
         'currentMembers': currentMembers + 1,
       });
 
+      // 사용자 정보 업데이트
       transaction.update(userRef, {
-        'joinedRooms': FieldValue.arrayUnion([roomId])
+        'currentPartyId': roomId,
+        'isInParty': true,
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
     });
   }

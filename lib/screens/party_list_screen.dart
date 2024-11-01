@@ -42,44 +42,30 @@ class _PartyListScreenState extends State<PartyListScreen> {
         return;
       }
 
-      // 이미 참여한 멤버인지 확인
-      if (room.members.containsKey(currentUser.uid)) {
-        // 참여 상태 업데이트
-        await _authService.updatePartyStatus(
-          userId: currentUser.uid,
-          partyId: room.id,
-          isInParty: true,
-        );
-
+      // 참여 인원 초과 체크
+      if (room.currentMembers >= room.maxMembers) {
         if (mounted) {
-          // 새로 참여하는 경우
-          await _chatService.joinRoom(room.id, currentUser.uid);
-          await _authService.updatePartyStatus(
-            userId: currentUser.uid,
-            partyId: room.id,
-            isInParty: true,
-          );
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('파티에 참여했습니다!')),
-            );
-
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatScreen(roomId: room.id),
-              ),
-            );
-          }
-      } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(roomId: room.id),
-            ),
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('이미 정원이 가득 찼습니다.')),
           );
         }
+        return;
+      }
+
+      // 채팅방 참여 처리
+      await _chatService.joinRoom(room.id, currentUser.uid);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('파티에 참여했습니다!')),
+        );
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(roomId: room.id),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
